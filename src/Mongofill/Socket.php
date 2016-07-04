@@ -12,6 +12,7 @@ class Socket
     private $host;
     private $port;
     private $connectTimeoutMS;
+    private $socketDomain = AF_INET;
 
     private static $lastRequestId = 3;
 
@@ -37,6 +38,16 @@ class Socket
             $ip = $this->host;
         } else {
             $ip = gethostbyname($this->host);
+            
+            if ($ip == $this->host) {
+                // Try to get ipv6
+                $dns = dns_get_record($this->host, DNS_AAAA);
+                if (isset($dns[0]['ipv6'])) {
+                    $this->socketDomain = AF_INET6;
+                    $ip = $dns[0]['ipv6'];
+                }
+            }
+
             if ($ip == $this->host) {
                 throw new MongoConnectionException(sprintf(
                     'couldn\'t get host info for %s',
@@ -57,7 +68,7 @@ class Socket
                 ));
             }
         } else {
-            $this->socket = socket_create(AF_INET, SOCK_STREAM, getprotobyname("tcp"));
+            $this->socket = socket_create($this->socketDomain, SOCK_STREAM, getprotobyname("tcp"));
             if (!$this->socket) {
                 throw new MongoConnectionException(sprintf(
                     'error creating socket: %s',
